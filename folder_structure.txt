@@ -1,0 +1,175 @@
+AFT-Monorepo/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       └── deploy.yml
+├── apps/
+│   ├── admin/                  # Next.js App Router (Vercel)
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── (dashboard)/
+│   │   │   │   │   ├── layout.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── loading.tsx
+│   │   │   │   ├── assets/
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   ├── [id]/
+│   │   │   │   │   │   ├── page.tsx
+│   │   │   │   │   │   └── edit/
+│   │   │   │   │   │       └── page.tsx
+│   │   │   │   ├── inventories/
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   ├── [id]/
+│   │   │   │   │   │   ├── page.tsx
+│   │   │   │   │   │   └── items/
+│   │   │   │   │   │       └── page.tsx
+│   │   │   │   ├── reconciliations/
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── [id]/
+│   │   │   │   │       ├── page.tsx
+│   │   │   │   │       └── report/
+│   │   │   │   │           ├── page.tsx
+│   │   │   │   │           └── generate/
+│   │   │   │   ├── upload/
+│   │   │   │   │   └── page.tsx  # Excel upload handler
+│   │   │   │   ├── api/
+│   │   │   │   │   ├── sync/
+│   │   │   │   │   │   └── route.ts
+│   │   │   │   │   ├── workflows/
+│   │   │   │   │   │   ├── reconciliationWorkflow.ts
+│   │   │   │   │   │   └── uploadWorkflow.ts
+│   │   │   │   │   └── assets/
+│   │   │   │   │       └── route.ts
+│   │   │   ├── components/
+│   │   │   │   ├── ui/
+│   │   │   │   │   ├── button.tsx
+│   │   │   │   │   ├── input.tsx
+│   │   │   │   │   ├── table.tsx
+│   │   │   │   │   └── qr-scanner.tsx
+│   │   │   │   ├── layout/
+│   │   │   │   │   ├── header.tsx
+│   │   │   │   │   └── sidebar.tsx
+│   │   │   │   └── forms/
+│   │   │   │       ├── asset-form.tsx
+│   │   │   │       └── inventory-form.tsx
+│   │   │   ├── lib/
+│   │   │   │   ├── supabase/
+│   │   │   │   │   ├── client.ts
+│   │   │   │   │   └── admin.ts
+│   │   │   │   ├── utils/
+│   │   │   │   │   ├── validation.ts
+│   │   │   │   │   ├── export.ts
+│   │   │   │   │   └── import.ts
+│   │   │   │   └── workflows/
+│   │   │   │       ├── types.ts
+│   │   │   │       └── helpers.ts
+│   │   │   ├── styles/
+│   │   │   │   └── globals.css
+│   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   ├── hooks/
+│   │   │   │   └── useAuth.ts
+│   │   │   ├── middleware.ts
+│   │   │   ├── vercel.ts
+│   │   │   ├── next.config.ts
+│   │   │   ├── tailwind.config.ts
+│   │   │   └── postcss.config.js
+│   │   ├── public/
+│   │   │   └── images/
+│   │   ├── tests/
+│   │   │   ├── unit/
+│   │   │   └── integration/
+│   │   ├── prisma/
+│   │   │   └── schema.prisma
+│   │   ├── .env.local
+│   │   ├── .env.production
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── mobile/                 # React Native (Expo)
+│       ├── src/
+│       │   ├── components/
+│       │   │   ├── AssetCard.tsx
+│       │   │   ├── InventoryList.tsx
+│       │   │   ├── Scanner.tsx
+│       │   │   ├── SyncButton.tsx
+│       │   │   └── OfflineIndicator.tsx
+│       │   ├── screens/
+│       │   │   ├── HomeScreen.tsx
+│       │   │   ├── InventoryScreen.tsx
+│       │   │   ├── ScanScreen.tsx
+│       │   │   ├── ResultsScreen.tsx
+│       │   │   └── SettingsScreen.tsx
+│       │   ├── navigation/
+│       │   │   └── AppNavigator.tsx
+│       │   ├── services/
+│       │   │   ├── supabaseService.ts
+│       │   │   ├── sqliteService.ts
+│       │   │   └── syncService.ts
+│       │   ├── store/
+│       │   │   ├── index.ts
+│       │   │   ├── assetsSlice.ts
+│       │   │   ├── inventorySlice.ts
+│       │   │   └── syncSlice.ts
+│       │   ├── utils/
+│       │   │   ├── validation.ts
+│       │   │   ├── constants.ts
+│       │   │   └── helpers.ts
+│       │   ├── hooks/
+│       │   │   └── useSync.ts
+│       │   ├── assets/
+│       │   │   ├── images/
+│       │   │   └── icons/
+│       │   ├── types/
+│       │   │   └── index.ts
+│       │   ├── App.tsx
+│       │   └── index.js
+│       ├── assets/
+│       │   └── fonts/
+│       ├── tests/
+│       │   ├── unit/
+│       │   └── e2e/
+│       ├── .expo/
+│       ├── App.json
+│       ├── babel.config.js
+│       ├── package.json
+│       └── tsconfig.json
+├── packages/
+│   ├── shared/                 # Código compartido entre admin y mobile
+│   │   ├── src/
+│   │   │   ├── types/
+│   │   │   │   ├── asset.ts
+│   │   │   │   ├── inventory.ts
+│   │   │   │   └── reconciliation.ts
+│   │   │   ├── constants/
+│   │   │   │   ├── assetIdFormat.ts
+│   │   │   │   └── apiEndpoints.ts
+│   │   │   ├── utils/
+│   │   │   │   ├── validation.ts
+│   │   │   │   ├── formatting.ts
+│   │   │   │   └── crypto.ts
+│   │   │   └── schemas/
+│   │   │       └── zod.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── ui/                     # Componentes UI compartidos (si se usa una biblioteca)
+│   │   └── ...
+│   └── supabase/
+│       ├── migrations/
+│       │   ├── 001_init.sql
+│       │   └── 002_rls_policies.sql
+│       ├── seed/
+│       │   └── seed.sql
+│       └── generate_types.ts
+├── scripts/
+│   ├── backup.sh
+│   ├── reset-db.sh
+│   └── generate-types.sh
+├── docs/
+│   ├── api/
+│   ├── architecture/
+│   └── user-guides/
+├── .gitignore
+├── README.md
+├── monorepo-package.json       # Para gestionar versiones y scripts globales
+├── turbo.json                  # Si se usa Turborepo
+└── pnpm-workspace.yaml         # Si se usa pnpm

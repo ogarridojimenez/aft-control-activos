@@ -1,0 +1,22 @@
+{
+  "name": "aft-monorepo",
+  "version": "1.0.0",
+  "description": "Sistema de Control de Activos Fijos Tangibles (AFT) - Monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel --filter=admin --filter=mobile",
+    "build": "turbo run build --filter=admin",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js"
+  },
+  "devDependencies": {
+    "turbo": "^1.10.0",
+    "typescript": "^5.0.0"
+  }
+}

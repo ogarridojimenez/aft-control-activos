@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx expo:*)",
+      "Bash(npx expo-doctor:*)",
+      "Bash(npx tsc:*)",
+      "Bash(dir apps\\\\mobile:*)",
+      "Bash(dir apps:*)",
+      "Bash(dir C:\\\\Users\\\\DELL\\\\Desktop\\\\AFT\\\\apps:*)",
+      "Bash(dir C:\\\\Users\\\\DELL\\\\Desktop\\\\AFT\\\\apps\\\\mobile:*)",
+      "Bash(dir:*)",
+      "Bash(del:*)",
+      "Bash(rm:*)",
+      "Bash(pkill -f \"node\\\\|expo\\\\|metro\")",
+      "Bash(taskkill /f /im node.exe)",
+      "Bash(wmic process:*)",
+      "Bash(tasklist /fi \"imagename eq node.exe\")",
+      "Bash(npm list:*)",
+      "Bash(npx --yes expo@51.0.39 start --offline --port 8100)",
+      "Bash(npx --yes expo@51.0.39 start --web --port 8105)",
+      "Bash(npx --yes expo@51.0.39 start --web --port 8106)",
+      "Bash(npx --yes expo@51.0.39 start --web --port 8107)",
+      "Bash(echo.:*)",
+      "Bash(copy nul:*)",
+      "Bash(npx --yes expo@51.0.39 start --web --port 8110)",
+      "Bash(npx --yes expo@51.0.39 start --web --port 8112)"
+    ]
+  }
+}

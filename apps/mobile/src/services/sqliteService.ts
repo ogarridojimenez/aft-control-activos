@@ -2,6 +2,7 @@ import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 
 let db: SQLiteDatabase | null = null;
+let migrationDone = false;
 
 // Web fallback storage
 const webTables = {
@@ -31,7 +32,7 @@ export function getDb(): SQLiteDatabase {
         asset_id TEXT NOT NULL,
         name TEXT,
         area_id TEXT NOT NULL,
-        inventory_id TEXT NOT NULL,
+        inventory_id TEXT NOT NULL DEFAULT '',
         synced_at TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS pending_scans (
@@ -46,6 +47,35 @@ export function getDb(): SQLiteDatabase {
       );
       CREATE INDEX IF NOT EXISTS idx_local_assets_inventory ON local_assets(inventory_id);
     `);
+  }
+  // Migration: ensure inventory_id column exists
+  if (!migrationDone) {
+    try {
+      const row = db.getFirstSync<{ cnt: number }>(
+        `SELECT COUNT(*) as cnt FROM pragma_table_info('local_assets') WHERE name='inventory_id'`
+      );
+      if (!row || row.cnt === 0) {
+        // Column doesn't exist - recreate table with new schema
+        db.execSync(`
+          CREATE TABLE IF NOT EXISTS local_assets_new (
+            id TEXT PRIMARY KEY NOT NULL,
+            asset_id TEXT NOT NULL,
+            name TEXT,
+            area_id TEXT NOT NULL,
+            inventory_id TEXT NOT NULL DEFAULT '',
+            synced_at TEXT NOT NULL
+          );
+          INSERT INTO local_assets_new (id, asset_id, name, area_id, synced_at)
+            SELECT id, asset_id, name, area_id, synced_at FROM local_assets;
+          DROP TABLE local_assets;
+          ALTER TABLE local_assets_new RENAME TO local_assets;
+          CREATE INDEX IF NOT EXISTS idx_local_assets_inventory ON local_assets(inventory_id);
+        `);
+      }
+    } catch (e) {
+      console.error('Migration error:', e);
+    }
+    migrationDone = true;
   }
   return db;
 }
@@ -86,10 +116,10 @@ export function insertLocalAssets(
     database.execSync('BEGIN TRANSACTION');
     // Borra activos previos de este inventario
     database.runSync(`DELETE FROM local_assets WHERE inventory_id = ?`, inventoryId);
-    // Inserta los nuevos
+    // Inserta los nuevos (OR REPLACE para evitar UNIQUE constraint en id duplicados)
     for (const r of rows) {
       database.runSync(
-        `INSERT INTO local_assets (id, asset_id, name, area_id, inventory_id, synced_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO local_assets (id, asset_id, name, area_id, inventory_id, synced_at) VALUES (?, ?, ?, ?, ?, ?)`,
         r.id,
         r.asset_id,
         r.name ?? '',

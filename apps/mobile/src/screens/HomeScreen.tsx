@@ -52,28 +52,24 @@ export function HomeScreen({ navigation }: Props) {
   const [assetsCount, setAssetsCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  const loadInventories = useCallback(async () => {
-    try {
-      const list = await fetchInventories();
-      setInventories(list as InventoryItem[]);
-      if (list.length > 0) {
-        const lastId = getMeta('last_inventory_id');
-        const found = list.find((i: InventoryItem) => i.id === lastId);
-        if (found) {
-          setSelectedId(found.id);
-        } else if (!selectedId) {
-          setSelectedId(list[0].id);
-        }
-      }
-      setLastUpdate(new Date());
-    } catch (e) {
-      Alert.alert('Error', 'No se pudieron cargar los inventarios.');
-    }
-  }, [selectedId]);
-
+  // Load inventories once on mount
   useEffect(() => {
-    loadInventories().then(() => setLoading(false));
-  }, [loadInventories]);
+    (async () => {
+      try {
+        const list = await fetchInventories();
+        setInventories(list as InventoryItem[]);
+        if (list.length > 0) {
+          const lastId = getMeta('last_inventory_id');
+          const found = (list as InventoryItem[]).find((i) => i.id === lastId);
+          setSelectedId(found?.id ?? list[0].id);
+        }
+        setLastUpdate(new Date());
+      } catch (e) {
+        Alert.alert('Error', 'No se pudieron cargar los inventarios.');
+      }
+      setLoading(false);
+    })();
+  }, []);
 
   // Update assets count when selection changes
   useEffect(() => {
@@ -84,12 +80,15 @@ export function HomeScreen({ navigation }: Props) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadInventories();
-    if (selectedId) {
-      setAssetsCount(getAssetsCount(selectedId));
+    try {
+      const list = await fetchInventories();
+      setInventories(list as InventoryItem[]);
+      setLastUpdate(new Date());
+    } catch (e) {
+      Alert.alert('Error', 'No se pudieron cargar los inventarios.');
     }
     setRefreshing(false);
-  }, [loadInventories, selectedId]);
+  }, []);
 
   async function onDownload() {
     const id = selectedId.trim();
@@ -97,14 +96,13 @@ export function HomeScreen({ navigation }: Props) {
       Alert.alert('Sin selección', 'Selecciona un inventario de la lista.');
       return;
     }
+    const inv = inventories.find((i) => i.id === id);
+    if (!inv) {
+      Alert.alert('Error', 'Inventario no encontrado en la lista.');
+      return;
+    }
     setBusy(true);
     try {
-      const inv = inventories.find((i) => i.id === id);
-      if (!inv) {
-        Alert.alert('Error', 'Inventario no encontrado en la lista.');
-        setBusy(false);
-        return;
-      }
       const assets = await fetchAssetsForArea(inv.area_id);
       insertLocalAssets(
         inv.id,
@@ -121,7 +119,9 @@ export function HomeScreen({ navigation }: Props) {
       setLastUpdate(new Date());
       Alert.alert('Descarga completada', `${count} activos guardados en SQLite`);
     } catch (e) {
-      Alert.alert('Error', 'No se pudo descargar. Verifica que el inventario exista.');
+      const msg = e instanceof Error ? e.message : 'Error desconocido';
+      console.error('Download error:', e);
+      Alert.alert('Error de descarga', msg);
     }
     setBusy(false);
   }

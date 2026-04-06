@@ -93,7 +93,7 @@ export function clearInventoryAssets(inventoryId: string) {
   getDb().runSync(`DELETE FROM local_assets WHERE inventory_id = ?`, inventoryId);
 }
 
-// Inserta activos asociados a un inventario específico (transacción atómica)
+// Inserta activos asociados a un inventario específico (batch insert optimizado)
 export function insertLocalAssets(
   inventoryId: string,
   rows: { id: string; asset_id: string; name: string | null; area_id: string }[]
@@ -110,24 +110,23 @@ export function insertLocalAssets(
     return;
   }
 
+  if (rows.length === 0) return;
+
   const database = getDb();
   const now = new Date().toISOString();
   try {
     database.execSync('BEGIN TRANSACTION');
     // Borra activos previos de este inventario
     database.runSync(`DELETE FROM local_assets WHERE inventory_id = ?`, inventoryId);
-    // Inserta los nuevos (OR REPLACE para evitar UNIQUE constraint en id duplicados)
-    for (const r of rows) {
-      database.runSync(
-        `INSERT OR REPLACE INTO local_assets (id, asset_id, name, area_id, inventory_id, synced_at) VALUES (?, ?, ?, ?, ?, ?)`,
-        r.id,
-        r.asset_id,
-        r.name ?? '',
-        r.area_id,
-        inventoryId,
-        now
-      );
-    }
+
+    // Batch insert: construye una sola query con múltiples valores
+    const placeholders = rows.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+    const values = rows.flatMap((r) => [r.id, r.asset_id, r.name ?? '', r.area_id, inventoryId, now]);
+    database.runSync(
+      `INSERT OR REPLACE INTO local_assets (id, asset_id, name, area_id, inventory_id, synced_at) VALUES ${placeholders}`,
+      ...values
+    );
+
     database.execSync('COMMIT');
   } catch (e) {
     database.execSync('ROLLBACK');

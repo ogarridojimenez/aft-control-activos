@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './HomeScreen';
@@ -32,6 +33,7 @@ export function LocalAssetsScreen({ navigation }: Props) {
   const [assets, setAssets] = useState<LocalAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadAssets = useCallback(() => {
     try {
@@ -54,6 +56,16 @@ export function LocalAssetsScreen({ navigation }: Props) {
     loadAssets();
   }, [loadAssets]);
 
+  const filteredAssets = useMemo(() => {
+    if (!searchQuery.trim()) return assets;
+    const query = searchQuery.toLowerCase().trim();
+    return assets.filter(
+      (a) =>
+        a.asset_id.toLowerCase().includes(query) ||
+        (a.name?.toLowerCase().includes(query) ?? false)
+    );
+  }, [assets, searchQuery]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -64,33 +76,74 @@ export function LocalAssetsScreen({ navigation }: Props) {
   }
 
   return (
-    <FlatList
-      data={assets}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <AssetItem item={item} />}
-      contentContainerStyle={assets.length === 0 ? styles.emptyContainer : styles.list}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      ListHeaderComponent={
-        <Text style={styles.count}>{assets.length} activos descargados</Text>
-      }
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>No hay activos descargados</Text>
-          <Text style={styles.emptySubtext}>
-            Descarga activos desde la pantalla principal
+    <View style={styles.container}>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar por ID o nombre..."
+          placeholderTextColor="#94a3b8"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <Text style={styles.searchResult}>
+            {filteredAssets.length} de {assets.length}
           </Text>
-        </View>
-      }
-      initialNumToRender={15}
-      maxToRenderPerBatch={10}
-      windowSize={5}
-    />
+        )}
+      </View>
+      <FlatList
+        data={filteredAssets}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <AssetItem item={item} />}
+        contentContainerStyle={filteredAssets.length === 0 ? styles.emptyContainer : styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListHeaderComponent={
+          <Text style={styles.count}>{assets.length} activos descargados</Text>
+        }
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>
+              {searchQuery ? 'No se encontraron activos' : 'No hay activos descargados'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery ? 'Intenta con otros términos' : 'Descarga activos desde la pantalla principal'}
+            </Text>
+          </View>
+        }
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  searchContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  searchInput: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#0f172a',
+  },
+  searchResult: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 6,
+  },
   list: { paddingBottom: 20 },
   count: {
     fontSize: 14,

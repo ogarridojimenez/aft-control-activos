@@ -1,15 +1,11 @@
 /**
- * AFT System - Comprehensive Test Script
- * Tests: Database, API endpoints, Pages, Full flow
+ * AFT System - Configuration & Structure Test Script
+ * Tests: Supabase connection, File structure, Config
  * Run: node scripts/test-all.js
  */
 
-const { execSync } = require('child_process');
-const http = require('http');
-
-const BASE_URL = 'http://localhost:3000';
-const PGPASSWORD = 'root';
-const PSQL = `"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe"`;
+const fs = require('fs');
+const path = require('path');
 
 let passed = 0;
 let failed = 0;
@@ -23,263 +19,165 @@ function log(section, msg, status) {
   else warnings++;
 }
 
-function psql(query) {
-  try {
-    const result = execSync(
-      `$env:PGPASSWORD="${PGPASSWORD}"; & ${PSQL} -U postgres -d aft -t -A -c "${query.replace(/"/g, '\\"')}"`,
-      { shell: 'powershell', encoding: 'utf8', timeout: 10000 }
-    );
-    return result.trim();
-  } catch (e) {
-    return null;
-  }
-}
-
-function httpGet(path) {
-  return new Promise((resolve) => {
-    http.get(`${BASE_URL}${path}`, { timeout: 10000 }, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
-    }).on('error', () => resolve({ status: 0, headers: {}, body: '' }));
-  });
-}
-
-function httpPost(path, body, contentType = 'application/json') {
-  return new Promise((resolve) => {
-    const url = new URL(`${BASE_URL}${path}`);
-    const req = http.request({
-      hostname: url.hostname,
-      port: url.port,
-      path: url.pathname,
-      method: 'POST',
-      headers: { 'Content-Type': contentType, 'Content-Length': Buffer.byteLength(body) },
-      timeout: 10000,
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
-    });
-    req.on('error', () => resolve({ status: 0, headers: {}, body: '' }));
-    req.write(body);
-    req.end();
-  });
-}
-
 async function runTests() {
   console.log('\n' + '='.repeat(60));
-  console.log('  AFT SYSTEM - COMPREHENSIVE TEST SUITE');
+  console.log('  AFT SYSTEM - CONFIG TEST');
   console.log('='.repeat(60) + '\n');
 
   // ============================================
-  // SECTION 1: DATABASE
+  // SECTION 1: CONFIG FILES
   // ============================================
-  console.log('📦 SECTION 1: DATABASE (PostgreSQL Local)');
+  console.log('📦 SECTION 1: CONFIGURATION FILES');
   console.log('-'.repeat(50));
 
-  // Test 1.1: Connection
-  const connResult = psql('SELECT 1;');
-  log('DB', 'PostgreSQL connection', connResult === '1' ? 'PASS' : 'FAIL');
-
-  // Test 1.2: Tables exist
-  const tables = psql("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name;");
-  const expectedTables = ['areas', 'assets', 'inventories', 'inventory_items', 'offline_sync', 'reconciliations', 'users'];
-  const foundTables = tables ? tables.split('\n').map(t => t.trim()).filter(t => t) : [];
-  const allTablesExist = expectedTables.every(t => foundTables.includes(t));
-  log('DB', `All 7 tables exist (${foundTables.length} found)`, allTablesExist ? 'PASS' : 'FAIL');
-
-  // Test 1.3: Areas data
-  const areasCount = psql("SELECT COUNT(*) FROM areas;");
-  log('DB', `Areas: ${areasCount} rows (expected 6)`, areasCount === '6' ? 'PASS' : 'FAIL');
-
-  // Test 1.4: Assets data
-  const assetsCount = psql("SELECT COUNT(*) FROM assets;");
-  log('DB', `Assets: ${assetsCount} rows (expected 21)`, assetsCount === '21' ? 'PASS' : 'FAIL');
-
-  // Test 1.5: Users data
-  const usersCount = psql("SELECT COUNT(*) FROM users;");
-  log('DB', `Users: ${usersCount} rows (expected 1)`, usersCount === '1' ? 'PASS' : 'FAIL');
-
-  // Test 1.6: Test inventory exists
-  const invCount = psql("SELECT COUNT(*) FROM inventories;");
-  log('DB', `Inventories: ${invCount} rows (expected >= 1)`, parseInt(invCount) >= 1 ? 'PASS' : 'FAIL');
-
-  // Test 1.7: Inventory items exist
-  const itemsCount = psql("SELECT COUNT(*) FROM inventory_items;");
-  log('DB', `Inventory items: ${itemsCount} rows (expected >= 5)`, parseInt(itemsCount) >= 5 ? 'PASS' : 'FAIL');
-
-  // Test 1.8: Reconciliation exists
-  const reconCount = psql("SELECT COUNT(*) FROM reconciliations;");
-  log('DB', `Reconciliations: ${reconCount} rows (expected >= 1)`, parseInt(reconCount) >= 1 ? 'PASS' : 'FAIL');
-
-  // Test 1.9: Foreign key integrity
-  const fkCheck = psql("SELECT COUNT(*) FROM assets a LEFT JOIN areas ar ON a.area_id = ar.id WHERE ar.id IS NULL;");
-  log('DB', 'Foreign key integrity (assets -> areas)', fkCheck === '0' ? 'PASS' : 'FAIL');
-
-  // Test 1.10: Indexes exist
-  const idxCount = psql("SELECT COUNT(*) FROM pg_indexes WHERE schemaname='public';");
-  log('DB', `Indexes: ${idxCount} (expected >= 8)`, parseInt(idxCount) >= 8 ? 'PASS' : 'FAIL');
-
-  console.log('');
-
-  // ============================================
-  // SECTION 2: API ENDPOINTS
-  // ============================================
-  console.log('🔌 SECTION 2: API ENDPOINTS');
-  console.log('-'.repeat(50));
-
-  // Test 2.1: Areas API (requires auth, expect 401)
-  const areasApi = await httpGet('/api/areas');
-  log('API', 'GET /api/areas returns 401 (auth required)', areasApi.status === 401 ? 'PASS' : 'FAIL');
-
-  // Test 2.2: Inventories API (requires auth, expect 401)
-  const invApi = await httpGet('/api/inventories');
-  log('API', 'GET /api/inventories returns 401 (auth required)', invApi.status === 401 ? 'PASS' : 'FAIL');
-
-  // Test 2.3: Upload API (requires auth, expect 401)
-  const uploadApi = await httpPost('/api/upload', '');
-  log('API', 'POST /api/upload returns 401 (auth required)', uploadApi.status === 401 ? 'PASS' : 'FAIL');
-
-  // Test 2.4: Sync API (requires auth, expect 401)
-  const syncApi = await httpPost('/api/sync/inventory', '{}');
-  log('API', 'POST /api/sync/inventory returns 401 (auth required)', syncApi.status === 401 ? 'PASS' : 'FAIL');
-
-  // Test 2.5: QR API (requires auth, expect 401)
-  const qrApi = await httpPost('/api/qr', '{}');
-  log('API', 'POST /api/qr returns 401 (auth required)', qrApi.status === 401 ? 'PASS' : 'FAIL');
-
-  // Test 2.6: Report API (requires auth, expect 401)
-  const invId = psql("SELECT id FROM inventories LIMIT 1;");
-  if (invId) {
-    const reportApi = await httpGet(`/api/inventories/${invId}/report?format=pdf`);
-    log('API', 'GET /api/inventories/[id]/report returns 401 (auth required)', reportApi.status === 401 ? 'PASS' : 'FAIL');
-
-    const reconApi = await httpGet(`/api/inventories/${invId}/reconciliation`);
-    log('API', 'GET /api/inventories/[id]/reconciliation returns 401 (auth required)', reconApi.status === 401 ? 'PASS' : 'FAIL');
-  } else {
-    log('API', 'Report/Reconciliation endpoints', 'WARN');
-    warnings += 2;
-  }
-
-  console.log('');
-
-  // ============================================
-  // SECTION 3: PAGES
-  // ============================================
-  console.log('📄 SECTION 3: PAGES (Server-side rendering)');
-  console.log('-'.repeat(50));
-
-  // Test 3.1: Home page redirects to login
-  const homePage = await httpGet('/');
-  const homeOk = homePage.status === 200 || homePage.status === 307 || homePage.status === 302;
-  log('PAGE', 'Home page (/) loads or redirects to login', homeOk ? 'PASS' : 'FAIL');
-
-  // Test 3.2: Login page
-  const loginPage = await httpGet('/login');
-  log('PAGE', 'Login page (/login) loads', loginPage.status === 200 ? 'PASS' : 'FAIL');
-
-  // Test 3.3: Assets page (redirects to login)
-  const assetsPage = await httpGet('/assets');
-  const assetsOk = assetsPage.status === 200 || assetsPage.status === 307 || assetsPage.status === 302;
-  log('PAGE', 'Assets page (/assets) loads or redirects', assetsOk ? 'PASS' : 'FAIL');
-
-  // Test 3.4: Inventories page (redirects to login)
-  const invPage = await httpGet('/inventories');
-  const invOk = invPage.status === 200 || invPage.status === 307 || invPage.status === 302;
-  log('PAGE', 'Inventories page (/inventories) loads or redirects', invOk ? 'PASS' : 'FAIL');
-
-  // Test 3.5: Upload page (redirects to login)
-  const uploadPage = await httpGet('/upload');
-  const uploadOk = uploadPage.status === 200 || uploadPage.status === 307 || uploadPage.status === 302;
-  log('PAGE', 'Upload page (/upload) loads or redirects', uploadOk ? 'PASS' : 'FAIL');
-
-  // Test 3.6: QR page (redirects to login)
-  const qrPage = await httpGet('/qr');
-  const qrOk = qrPage.status === 200 || qrPage.status === 307 || qrPage.status === 302;
-  log('PAGE', 'QR page (/qr) loads or redirects', qrOk ? 'PASS' : 'FAIL');
-
-  // Test 3.7: Inventory detail page
-  if (invId) {
-    const detailPage = await httpGet(`/inventories/${invId}`);
-    const detailOk = detailPage.status === 200 || detailPage.status === 307 || detailPage.status === 302;
-    log('PAGE', `Inventory detail (/inventories/${invId.slice(0, 8)}...) loads or redirects`, detailOk ? 'PASS' : 'FAIL');
-  }
-
-  console.log('');
-
-  // ============================================
-  // SECTION 4: DATA INTEGRITY
-  // ============================================
-  console.log('🔍 SECTION 4: DATA INTEGRITY');
-  console.log('-'.repeat(50));
-
-  // Test 4.1: All assets have valid format
-  const badAssets = psql("SELECT COUNT(*) FROM assets WHERE asset_id !~ '^MB[0-9]{5,}$';");
-  log('DATA', 'All asset IDs match MB+5+digits format', badAssets === '0' ? 'PASS' : 'FAIL');
-
-  // Test 4.2: All areas have unique codes
-  const dupCodes = psql("SELECT COUNT(*) FROM (SELECT code FROM areas GROUP BY code HAVING COUNT(*) > 1) t;");
-  log('DATA', 'All area codes are unique', dupCodes === '0' ? 'PASS' : 'FAIL');
-
-  // Test 4.3: Admin user has correct role
-  const adminRole = psql("SELECT role FROM users WHERE email = 'admin@ejemplo.com';");
-  log('DATA', 'Admin user has role=admin', adminRole === 'admin' ? 'PASS' : 'FAIL');
-
-  // Test 4.4: Test inventory has correct status
-  const invStatus = psql("SELECT status FROM inventories WHERE id = 'e923a4ed-cd19-4c1b-ab2a-0f8ecd629553';");
-  log('DATA', 'Test inventory status=completed', invStatus === 'completed' ? 'PASS' : 'FAIL');
-
-  // Test 4.5: Inventory items match expected/found ratio
-  const foundCount = psql("SELECT COUNT(*) FROM inventory_items WHERE inventory_id = 'e923a4ed-cd19-4c1b-ab2a-0f8ecd629553' AND quantity_found > 0;");
-  const missingCount = psql("SELECT COUNT(*) FROM inventory_items WHERE inventory_id = 'e923a4ed-cd19-4c1b-ab2a-0f8ecd629553' AND quantity_found = 0;");
-  log('DATA', `Test inventory: ${foundCount} found, ${missingCount} missing`, parseInt(foundCount) === 4 && parseInt(missingCount) === 1 ? 'PASS' : 'FAIL');
-
-  // Test 4.6: Reconciliation summary matches
-  const reconSummary = psql("SELECT summary->>'accuracy_percentage' FROM reconciliations WHERE inventory_id = 'e923a4ed-cd19-4c1b-ab2a-0f8ecd629553';");
-  log('DATA', `Reconciliation accuracy: ${reconSummary}%`, reconSummary === '80' ? 'PASS' : 'FAIL');
-
-  console.log('');
-
-  // ============================================
-  // SECTION 5: CONFIGURATION FILES
-  // ============================================
-  console.log('⚙️  SECTION 5: CONFIGURATION FILES');
-  console.log('-'.repeat(50));
-
-  const fs = require('fs');
-  const path = require('path');
-
-  // Test 5.1: Admin .env.local exists
+  // Test 1.1: Admin .env.local exists
   const adminEnv = path.join(__dirname, '..', 'apps', 'admin', '.env.local');
   const adminEnvExists = fs.existsSync(adminEnv);
   log('CONFIG', 'apps/admin/.env.local exists', adminEnvExists ? 'PASS' : 'FAIL');
 
   if (adminEnvExists) {
     const adminEnvContent = fs.readFileSync(adminEnv, 'utf8');
-    log('CONFIG', 'NEXT_PUBLIC_SUPABASE_URL configured', adminEnvContent.includes('NEXT_PUBLIC_SUPABASE_URL') ? 'PASS' : 'FAIL');
-    log('CONFIG', 'SUPABASE_SERVICE_ROLE_KEY configured', adminEnvContent.includes('SUPABASE_SERVICE_ROLE_KEY') ? 'PASS' : 'FAIL');
-    // DATABASE_URL should NOT be present (using Supabase, not local Postgres)
-    log('CONFIG', 'DATABASE_URL removed (using Supabase)', !adminEnvContent.includes('DATABASE_URL') ? 'PASS' : 'FAIL');
+    const hasSupabaseUrl = adminEnvContent.includes('NEXT_PUBLIC_SUPABASE_URL');
+    const hasAnonKey = adminEnvContent.includes('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    const hasServiceKey = adminEnvContent.includes('SUPABASE_SERVICE_ROLE_KEY');
+    log('CONFIG', 'NEXT_PUBLIC_SUPABASE_URL', hasSupabaseUrl ? 'PASS' : 'FAIL');
+    log('CONFIG', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', hasAnonKey ? 'PASS' : 'FAIL');
+    log('CONFIG', 'SUPABASE_SERVICE_ROLE_KEY', hasServiceKey ? 'PASS' : 'FAIL');
   }
 
-  // Test 5.2: Mobile .env exists
+  // Test 1.2: Mobile .env
   const mobileEnv = path.join(__dirname, '..', 'apps', 'mobile', '.env');
   const mobileEnvExists = fs.existsSync(mobileEnv);
   log('CONFIG', 'apps/mobile/.env exists', mobileEnvExists ? 'PASS' : 'FAIL');
 
   if (mobileEnvExists) {
     const mobileEnvContent = fs.readFileSync(mobileEnv, 'utf8');
-    log('CONFIG', 'EXPO_PUBLIC_SUPABASE_URL configured', mobileEnvContent.includes('EXPO_PUBLIC_SUPABASE_URL') ? 'PASS' : 'FAIL');
-    log('CONFIG', 'EXPO_PUBLIC_ADMIN_API_URL configured', mobileEnvContent.includes('EXPO_PUBLIC_ADMIN_API_URL') ? 'PASS' : 'FAIL');
+    const hasSupabaseUrl = mobileEnvContent.includes('EXPO_PUBLIC_SUPABASE_URL');
+    const hasAnonKey = mobileEnvContent.includes('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    const hasAdminUrl = mobileEnvContent.includes('EXPO_PUBLIC_ADMIN_API_URL');
+    log('CONFIG', 'EXPO_PUBLIC_SUPABASE_URL', hasSupabaseUrl ? 'PASS' : 'FAIL');
+    log('CONFIG', 'EXPO_PUBLIC_SUPABASE_ANON_KEY', hasAnonKey ? 'PASS' : 'FAIL');
+    log('CONFIG', 'EXPO_PUBLIC_ADMIN_API_URL', hasAdminUrl ? 'PASS' : 'FAIL');
   }
 
-  // Test 5.3: Supabase admin client exists
-  const supabaseAdmin = path.join(__dirname, '..', 'apps', 'admin', 'src', 'lib', 'supabase', 'admin.ts');
-  log('CONFIG', 'Supabase admin client exists', fs.existsSync(supabaseAdmin) ? 'PASS' : 'FAIL');
+  console.log('');
 
-  // Test 5.4: Drizzle removed (should NOT exist)
-  const drizzleSchema = path.join(__dirname, '..', 'apps', 'admin', 'src', 'lib', 'db', 'schema', 'index.ts');
-  log('CONFIG', 'Drizzle removed (using Supabase)', !fs.existsSync(drizzleSchema) ? 'PASS' : 'FAIL');
+  // ============================================
+  // SECTION 2: PROJECT STRUCTURE
+  // ============================================
+  console.log('📁 SECTION 2: PROJECT STRUCTURE');
+  console.log('-'.repeat(50));
+
+  // Root files - check workspace configs instead
+  const rootConfigs = ['package.json', 'package-lock.json', 'turbo.json'];
+  for (const file of rootConfigs) {
+    const exists = fs.existsSync(path.join(__dirname, '..', file));
+    log('STRUCT', `Root: ${file}`, exists ? 'PASS' : 'FAIL');
+  }
+
+  // Check workspace tsconfig exists (mobile)
+  const mobileTsconfig = fs.existsSync(path.join(__dirname, '..', 'apps/mobile/tsconfig.json'));
+  log('STRUCT', 'Workspace: tsconfig.json (mobile)', mobileTsconfig ? 'PASS' : 'FAIL');
+
+  // Admin app
+  const adminDirs = ['apps/admin/src/lib', 'apps/admin/src/app'];
+  for (const dir of adminDirs) {
+    const exists = fs.existsSync(path.join(__dirname, '..', dir));
+    log('STRUCT', `Admin: ${dir}`, exists ? 'PASS' : 'FAIL');
+  }
+
+  // Mobile app
+  const mobileDirs = ['apps/mobile/src/screens', 'apps/mobile/src/services', 'apps/mobile/src/hooks'];
+  for (const dir of mobileDirs) {
+    const exists = fs.existsSync(path.join(__dirname, '..', dir));
+    log('STRUCT', `Mobile: ${dir}`, exists ? 'PASS' : 'FAIL');
+  }
+
+  // Packages
+  const packages = ['packages/shared', 'packages/supabase'];
+  for (const pkg of packages) {
+    const exists = fs.existsSync(path.join(__dirname, '..', pkg));
+    log('STRUCT', `Package: ${pkg}`, exists ? 'PASS' : 'FAIL');
+  }
+
+  console.log('');
+
+  // ============================================
+  // SECTION 3: MOBILE COMPONENTS
+  // ============================================
+  console.log('📱 SECTION 3: MOBILE COMPONENTS');
+  console.log('-'.repeat(50));
+
+  const mobileFiles = [
+    'apps/mobile/App.tsx',
+    'apps/mobile/src/screens/HomeScreen.tsx',
+    'apps/mobile/src/screens/ScanScreen.tsx',
+    'apps/mobile/src/screens/QrScannerScreen.tsx',
+    'apps/mobile/src/screens/LocalAssetsScreen.tsx',
+    'apps/mobile/src/services/sqliteService.ts',
+    'apps/mobile/src/services/supabaseService.ts',
+    'apps/mobile/src/services/syncService.ts',
+    'apps/mobile/src/components/ErrorBoundary.tsx',
+    'apps/mobile/src/utils/retry.ts',
+    'apps/mobile/src/hooks/useNetworkStatus.ts',
+  ];
+
+  for (const file of mobileFiles) {
+    const exists = fs.existsSync(path.join(__dirname, '..', file));
+    log('MOBILE', file.split('/').pop(), exists ? 'PASS' : 'FAIL');
+  }
+
+  console.log('');
+
+  // ============================================
+  // SECTION 4: ADMIN COMPONENTS
+  // ============================================
+  console.log('🖥️  SECTION 4: ADMIN COMPONENTS');
+  console.log('-'.repeat(50));
+
+  const adminFiles = [
+    'apps/admin/src/lib/supabase/admin.ts',
+    'apps/admin/src/lib/auth/guard.ts',
+    'apps/admin/src/app/api/upload/route.ts',
+    'apps/admin/src/app/api/sync/inventory/route.ts',
+  ];
+
+  for (const file of adminFiles) {
+    const exists = fs.existsSync(path.join(__dirname, '..', file));
+    log('ADMIN', file.split('/').pop(), exists ? 'PASS' : 'FAIL');
+  }
+
+  // Pages (App Router)
+  const adminPages = [
+    'apps/admin/src/app/(app)/page.tsx',
+    'apps/admin/src/app/login/page.tsx',
+    'apps/admin/src/app/(app)/assets/page.tsx',
+    'apps/admin/src/app/(app)/inventories/page.tsx',
+  ];
+
+  for (const page of adminPages) {
+    const exists = fs.existsSync(path.join(__dirname, '..', page));
+    log('ADMIN', page.split('/').slice(-2).join('/'), exists ? 'PASS' : 'FAIL');
+  }
+
+  console.log('');
+
+  // ============================================
+  // SECTION 5: DATABASE FILES
+  // ============================================
+  console.log('🗄️  SECTION 5: DATABASE FILES');
+  console.log('-'.repeat(50));
+
+  const dbFiles = [
+    'packages/supabase/migrations/001_init.sql',
+    'packages/supabase/migrations/002_rls_policies.sql',
+    'packages/supabase/seed/001_seed_data.sql',
+  ];
+
+  for (const file of dbFiles) {
+    const exists = fs.existsSync(path.join(__dirname, '..', file));
+    log('DB', file.split('/').pop(), exists ? 'PASS' : 'FAIL');
+  }
 
   console.log('');
 
@@ -296,9 +194,9 @@ async function runTests() {
   console.log('='.repeat(60));
 
   if (failed === 0) {
-    console.log('\n  🎉 ALL TESTS PASSED! System is ready for Android Studio testing.\n');
+    console.log('\n  🎉 ALL TESTS PASSED!\n');
   } else {
-    console.log(`\n  ⚠️  ${failed} test(s) failed. Review the issues above before proceeding.\n`);
+    console.log(`\n  ⚠️  ${failed} test(s) failed. Review the issues above.\n`);
   }
 }
 

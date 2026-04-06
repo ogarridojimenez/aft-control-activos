@@ -4,7 +4,9 @@
  */
 import { useState, useEffect, useRef } from 'react';
 
-const CHECK_INTERVAL = 10000; // Check every 10 seconds
+const CHECK_INTERVAL = 10000;
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 
 export function useNetworkStatus() {
   const [isConnected, setIsConnected] = useState(true);
@@ -14,11 +16,11 @@ export function useNetworkStatus() {
     let cancelled = false;
 
     const checkConnection = async () => {
+      if (!SUPABASE_URL) return;
       try {
-        // Use Supabase auth health endpoint as ping
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
-        const response = await fetch('https://iumsxhhafjdldtrpggia.supabase.co/auth/v1/health', {
+        const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
           method: 'GET',
           signal: controller.signal,
         });
@@ -33,10 +35,8 @@ export function useNetworkStatus() {
       }
     };
 
-    // Initial check
     checkConnection();
 
-    // Periodic checks
     intervalRef.current = setInterval(checkConnection, CHECK_INTERVAL);
 
     return () => {

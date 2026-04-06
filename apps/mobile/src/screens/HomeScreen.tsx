@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -47,29 +48,48 @@ export function HomeScreen({ navigation }: Props) {
   const [selectedId, setSelectedId] = useState(() => getMeta('last_inventory_id') ?? '');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [assetsCount, setAssetsCount] = useState(0);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  useEffect(() => {
-    loadInventories();
-  }, []);
-
-  async function loadInventories() {
-    setLoading(true);
+  const loadInventories = useCallback(async () => {
     try {
       const list = await fetchInventories();
       setInventories(list as InventoryItem[]);
-      if (list.length > 0 && !selectedId) {
-        setSelectedId(list[0].id);
+      if (list.length > 0) {
+        const lastId = getMeta('last_inventory_id');
+        const found = list.find((i: InventoryItem) => i.id === lastId);
+        if (found) {
+          setSelectedId(found.id);
+        } else if (!selectedId) {
+          setSelectedId(list[0].id);
+        }
       }
-      // Update assets count for the selected inventory
-      if (selectedId) {
-        setAssetsCount(getAssetsCount(selectedId));
-      }
+      setLastUpdate(new Date());
     } catch (e) {
-      Alert.alert('Error', 'No se pudieron cargar los inventarios. Verifica la conexión a Supabase.');
+      Alert.alert('Error', 'No se pudieron cargar los inventarios.');
     }
-    setLoading(false);
-  }
+  }, [selectedId]);
+
+  useEffect(() => {
+    loadInventories().then(() => setLoading(false));
+  }, [loadInventories]);
+
+  // Update assets count when selection changes
+  useEffect(() => {
+    if (selectedId) {
+      setAssetsCount(getAssetsCount(selectedId));
+    }
+  }, [selectedId]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadInventories();
+    if (selectedId) {
+      setAssetsCount(getAssetsCount(selectedId));
+    }
+    setRefreshing(false);
+  }, [loadInventories, selectedId]);
 
   async function onDownload() {
     const id = selectedId.trim();
@@ -98,6 +118,7 @@ export function HomeScreen({ navigation }: Props) {
       setMeta('last_inventory_id', id);
       const count = getAssetsCount(inv.id);
       setAssetsCount(count);
+      setLastUpdate(new Date());
       Alert.alert('Descarga completada', `${count} activos guardados en SQLite`);
     } catch (e) {
       Alert.alert('Error', 'No se pudo descargar. Verifica que el inventario exista.');
@@ -135,11 +156,22 @@ export function HomeScreen({ navigation }: Props) {
   const selectedInv = inventories.find((i) => i.id === selectedId);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <Text style={styles.title}>AFT — Campo</Text>
       <Text style={styles.sub}>
         Selecciona un inventario, descarga los activos, escanea y sincroniza.
       </Text>
+
+      {lastUpdate && (
+        <Text style={styles.lastUpdate}>
+          Última actualización: {lastUpdate.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      )}
 
       {/* Inventory selector */}
       <View style={styles.card}>
@@ -220,6 +252,7 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40, backgroundColor: '#f8fafc' },
   title: { fontSize: 22, fontWeight: '700', color: '#0f172a' },
   sub: { marginTop: 8, color: '#475569', lineHeight: 20 },
+  lastUpdate: { marginTop: 6, fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
   card: {
     marginTop: 16,
     backgroundColor: '#fff',

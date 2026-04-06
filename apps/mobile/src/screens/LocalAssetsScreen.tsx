@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { getLocalAssets, type LocalAsset } from '../services/sqliteService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LocalAssets'>;
 
-const AssetItem = ({ item }: { item: LocalAsset }) => (
+const AssetItem = React.memo(({ item }: { item: LocalAsset }) => (
   <View style={styles.assetItem}>
     <View style={styles.assetHeader}>
       <Text style={styles.assetId}>{item.asset_id}</Text>
@@ -24,7 +24,9 @@ const AssetItem = ({ item }: { item: LocalAsset }) => (
       Descargado: {new Date(item.synced_at).toLocaleDateString('es')}
     </Text>
   </View>
-);
+));
+
+AssetItem.displayName = 'AssetItem';
 
 export function LocalAssetsScreen({ navigation }: Props) {
   const [assets, setAssets] = useState<LocalAsset[]>([]);

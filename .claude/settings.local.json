@@ -26,7 +26,26 @@
       "Bash(echo.:*)",
       "Bash(copy nul:*)",
       "Bash(npx --yes expo@51.0.39 start --web --port 8110)",
-      "Bash(npx --yes expo@51.0.39 start --web --port 8112)"
+      "Bash(npx --yes expo@51.0.39 start --web --port 8112)",
+      "Bash(npx --yes expo@51.0.39 start --android)",
+      "Bash(adb devices:*)",
+      "Bash(findstr device:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8081)",
+      "Bash(taskkill:*)",
+      "Bash(curl -I http://localhost:8081)",
+      "Bash(findstr HTTP)",
+      "Bash(ipconfig)",
+      "Bash(findstr \"IPv4\")",
+      "Bash(node:*)",
+      "Bash(curl -s http://localhost:3002)",
+      "Bash(start:*)",
+      "Bash(curl:*)",
+      "Bash(findstr :3002)",
+      "Bash(tasklist:*)",
+      "Bash(netstat -aon)",
+      "Bash(pkill -f \"expo\\\\|metro\")",
+      "Bash(timeout 10)"
     ]
   }
 }

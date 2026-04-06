@@ -12,4 +12,23 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
+config.transformer = {
+  ...config.transformer,
+  minifierPath: 'react-native-minify-transformer',
+};
+
+config.resolver = {
+  ...config.resolver,
+  sourceExts: [...config.resolver.sourceExts, 'cjs', 'json'],
+  resolveRequest: (context, moduleName, platform) => {
+    if (platform === 'ios' || platform === 'android') {
+      return {
+        filePath: moduleName,
+        type: 'sourceFile',
+      };
+    }
+    return context.resolveRequest(context, moduleName, platform);
+  },
+};
+
 module.exports = config;

@@ -141,19 +141,27 @@ export function HomeScreen({ navigation }: Props) {
       Alert.alert('Sin escaneos', 'No hay pendientes para este inventario.');
       return;
     }
-    setSyncProgress({ current: 0, total: pending.length });
     setBusy(true);
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       const token = session?.access_token ?? '';
-      
-      setSyncProgress({ current: Math.floor(pending.length * 0.5), total: pending.length });
-      
-      const result = await syncInventoryToAdmin(id, pending, token);
-      
-      setSyncProgress({ current: pending.length, total: pending.length });
+
+      const result = await syncInventoryToAdmin(
+        id,
+        pending,
+        token,
+        (progress) => {
+          if (progress.phase === 'uploading') {
+            setSyncProgress({
+              current: progress.scannedCount,
+              total: progress.totalScans,
+            });
+          }
+        }
+      );
+
       clearPendingScansForInventory(id);
       Alert.alert(
         'Sincronizado',

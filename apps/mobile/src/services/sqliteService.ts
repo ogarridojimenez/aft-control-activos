@@ -20,6 +20,17 @@ export interface LocalAsset {
   synced_at: string;
 }
 
+export interface CachedInventory {
+  id: string;
+  area_id: string;
+  inventory_date: string;
+  status: string;
+  notes: string | null;
+  area_name: string | null;
+  area_code: string | null;
+  cached_at: string;
+}
+
 export function getDb(): SQLiteDatabase {
   if (Platform.OS === 'web') {
     throw new Error('SQLite no disponible en web');
@@ -44,6 +55,16 @@ export function getDb(): SQLiteDatabase {
       CREATE TABLE IF NOT EXISTS app_meta (
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS cached_inventories (
+        id TEXT PRIMARY KEY NOT NULL,
+        area_id TEXT NOT NULL,
+        inventory_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        notes TEXT,
+        area_name TEXT,
+        area_code TEXT,
+        cached_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_local_assets_inventory ON local_assets(inventory_id);
     `);
@@ -257,4 +278,58 @@ export function getMeta(key: string): string | null {
   }
   const row = getDb().getFirstSync<{ value: string }>(`SELECT value FROM app_meta WHERE key = ?`, key);
   return row?.value ?? null;
+}
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+export function cacheInventories(inventories: CachedInventory[]) {
+  const now = new Date().toISOString();
+  const database = getDb();
+  database.execSync('BEGIN TRANSACTION');
+  database.runSync(`DELETE FROM cached_inventories`);
+  if (inventories.length > 0) {
+    const placeholders = inventories.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+    const values = inventories.flatMap((inv) => [
+      inv.id,
+      inv.area_id,
+      inv.inventory_date,
+      inv.status,
+      inv.notes ?? '',
+      inv.area_name ?? '',
+      inv.area_code ?? '',
+      now,
+    ]);
+    database.runSync(
+      `INSERT OR REPLACE INTO cached_inventories (id, area_id, inventory_date, status, notes, area_name, area_code, cached_at) VALUES ${placeholders}`,
+      ...values
+    );
+  }
+  database.execSync('COMMIT');
+}
+
+export function getCachedInventories(): CachedInventory[] {
+  const cached = getMeta('inventories_cache_valid');
+  if (!cached) return [];
+  
+  const database = getDb();
+  const rows = database.getAllSync<CachedInventory>(
+    `SELECT id, area_id, inventory_date, status, notes, area_name, area_code, cached_at FROM cached_inventories ORDER BY inventory_date DESC`
+  );
+  return rows;
+}
+
+export function isInventoriesCacheValid(): boolean {
+  const lastCache = getMeta('inventories_cache_timestamp');
+  if (!lastCache) return false;
+  const age = Date.now() - parseInt(lastCache, 10);
+  return age < CACHE_TTL_MS;
+}
+
+export function setInventoriesCacheTimestamp() {
+  setMeta('inventories_cache_timestamp', Date.now().toString());
+}
+
+export function clearInventoriesCache() {
+  getDb().runSync(`DELETE FROM cached_inventories`);
+  setMeta('inventories_cache_timestamp', '');
 }

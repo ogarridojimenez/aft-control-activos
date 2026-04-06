@@ -28,6 +28,7 @@ export type RootStackParamList = {
   Home: undefined;
   Scan: { inventoryId: string };
   QrScanner: { inventoryId: string; onScanSuccess: (code: string) => void };
+  LocalAssets: undefined;
 };
 
 type InventoryItem = {
@@ -46,6 +47,7 @@ export function HomeScreen({ navigation }: Props) {
   const [selectedId, setSelectedId] = useState(() => getMeta('last_inventory_id') ?? '');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [assetsCount, setAssetsCount] = useState(0);
 
   useEffect(() => {
     loadInventories();
@@ -58,6 +60,10 @@ export function HomeScreen({ navigation }: Props) {
       setInventories(list as InventoryItem[]);
       if (list.length > 0 && !selectedId) {
         setSelectedId(list[0].id);
+      }
+      // Update assets count for the selected inventory
+      if (selectedId) {
+        setAssetsCount(getAssetsCount(selectedId));
       }
     } catch (e) {
       Alert.alert('Error', 'No se pudieron cargar los inventarios. Verifica la conexión a Supabase.');
@@ -91,6 +97,7 @@ export function HomeScreen({ navigation }: Props) {
       );
       setMeta('last_inventory_id', id);
       const count = getAssetsCount(inv.id);
+      setAssetsCount(count);
       Alert.alert('Descarga completada', `${count} activos guardados en SQLite`);
     } catch (e) {
       Alert.alert('Error', 'No se pudo descargar. Verifica que el inventario exista.');
@@ -181,6 +188,15 @@ export function HomeScreen({ navigation }: Props) {
         )}
         <Pressable style={styles.btn} onPress={onDownload} disabled={busy || inventories.length === 0}>
           <Text style={styles.btnText}>Descargar activos</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.btn, styles.btnOutline]}
+          onPress={() => navigation.navigate('LocalAssets')}
+          disabled={assetsCount === 0}
+        >
+          <Text style={styles.btnOutlineText}>
+            Ver activos descargados ({assetsCount})
+          </Text>
         </Pressable>
         <Pressable
           style={[styles.btn, styles.btnOutline]}

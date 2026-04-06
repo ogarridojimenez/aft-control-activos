@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen, type RootStackParamList } from './src/screens/HomeScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { QrScannerScreen } from './src/screens/QrScannerScreen';
+import { LocalAssetsScreen } from './src/screens/LocalAssetsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -20,6 +21,7 @@ export default function App() {
       >
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'AFT' }} />
         <Stack.Screen name="Scan" component={ScanScreen} options={{ title: 'Escaneo' }} />
+        <Stack.Screen name="LocalAssets" component={LocalAssetsScreen} options={{ title: 'Activos descargados' }} />
         <Stack.Screen
           name="QrScanner"
           options={{

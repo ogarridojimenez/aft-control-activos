@@ -12,11 +12,6 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-config.transformer = {
-  ...config.transformer,
-  minifierPath: 'react-native-minify-transformer',
-};
-
 config.resolver = {
   ...config.resolver,
   sourceExts: [...config.resolver.sourceExts, 'cjs', 'json'],

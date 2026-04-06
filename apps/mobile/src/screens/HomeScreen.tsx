@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  clearLocalAssets,
+  getAssetsCount,
   getPendingScansForInventory,
   clearPendingScansForInventory,
   insertLocalAssets,
@@ -80,8 +80,8 @@ export function HomeScreen({ navigation }: Props) {
         return;
       }
       const assets = await fetchAssetsForArea(inv.area_id);
-      clearLocalAssets();
       insertLocalAssets(
+        inv.id,
         assets.map((a) => ({
           id: a.id,
           asset_id: a.asset_id,
@@ -90,7 +90,8 @@ export function HomeScreen({ navigation }: Props) {
         }))
       );
       setMeta('last_inventory_id', id);
-      Alert.alert('Descarga completada', `${assets.length} activos guardados en SQLite`);
+      const count = getAssetsCount(inv.id);
+      Alert.alert('Descarga completada', `${count} activos guardados en SQLite`);
     } catch (e) {
       Alert.alert('Error', 'No se pudo descargar. Verifica que el inventario exista.');
     }

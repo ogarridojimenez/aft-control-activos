@@ -2,21 +2,27 @@ import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 
 let db: SQLiteDatabase | null = null;
-let webStorage: Map<string, any> = new Map();
 
-// Simulación de tablas para web
+// Web fallback storage
 const webTables = {
-  local_assets: new Map(),
-  pending_scans: new Map(),
-  app_meta: new Map()
+  local_assets: new Map<string, any>(),
+  pending_scans: new Map<string, any>(),
+  app_meta: new Map<string, string>(),
 };
+
+export interface LocalAsset {
+  id: string;
+  asset_id: string;
+  name: string | null;
+  area_id: string;
+  inventory_id: string;
+  synced_at: string;
+}
 
 export function getDb(): SQLiteDatabase {
   if (Platform.OS === 'web') {
-    // En web, lanzamos un error controlado ya que SQLite no funciona
-    throw new Error('SQLite no está disponible en modo web');
+    throw new Error('SQLite no disponible en web');
   }
-
   if (!db) {
     db = openDatabaseSync('aft.db');
     db.execSync(`
@@ -25,6 +31,7 @@ export function getDb(): SQLiteDatabase {
         asset_id TEXT NOT NULL,
         name TEXT,
         area_id TEXT NOT NULL,
+        inventory_id TEXT NOT NULL,
         synced_at TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS pending_scans (
@@ -37,20 +44,28 @@ export function getDb(): SQLiteDatabase {
         key TEXT PRIMARY KEY NOT NULL,
         value TEXT NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS idx_local_assets_inventory ON local_assets(inventory_id);
     `);
   }
   return db;
 }
 
-export function clearLocalAssets() {
+// Reemplaza clearLocalAssets — borra solo los activos de un inventario
+export function clearInventoryAssets(inventoryId: string) {
   if (Platform.OS === 'web') {
-    webTables.local_assets.clear();
+    for (const [key, asset] of webTables.local_assets.entries()) {
+      if (asset.inventory_id === inventoryId) {
+        webTables.local_assets.delete(key);
+      }
+    }
     return;
   }
-  getDb().execSync('DELETE FROM local_assets');
+  getDb().runSync(`DELETE FROM local_assets WHERE inventory_id = ?`, inventoryId);
 }
 
+// Inserta activos asociados a un inventario específico (transacción atómica)
 export function insertLocalAssets(
+  inventoryId: string,
   rows: { id: string; asset_id: string; name: string | null; area_id: string }[]
 ) {
   if (Platform.OS === 'web') {
@@ -58,7 +73,8 @@ export function insertLocalAssets(
     for (const r of rows) {
       webTables.local_assets.set(r.id, {
         ...r,
-        synced_at: now
+        inventory_id: inventoryId,
+        synced_at: now,
       });
     }
     return;
@@ -66,18 +82,66 @@ export function insertLocalAssets(
 
   const database = getDb();
   const now = new Date().toISOString();
-  for (const r of rows) {
-    database.runSync(
-      `INSERT OR REPLACE INTO local_assets (id, asset_id, name, area_id, synced_at) VALUES (?, ?, ?, ?, ?)`,
-      r.id,
-      r.asset_id,
-      r.name ?? '',
-      r.area_id,
-      now
-    );
+  try {
+    database.execSync('BEGIN TRANSACTION');
+    // Borra activos previos de este inventario
+    database.runSync(`DELETE FROM local_assets WHERE inventory_id = ?`, inventoryId);
+    // Inserta los nuevos
+    for (const r of rows) {
+      database.runSync(
+        `INSERT INTO local_assets (id, asset_id, name, area_id, inventory_id, synced_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        r.id,
+        r.asset_id,
+        r.name ?? '',
+        r.area_id,
+        inventoryId,
+        now
+      );
+    }
+    database.execSync('COMMIT');
+  } catch (e) {
+    database.execSync('ROLLBACK');
+    throw e;
   }
 }
 
+// Obtiene todos los activos locales, opcionalmente filtrados por inventario
+export function getLocalAssets(inventoryId?: string): LocalAsset[] {
+  if (Platform.OS === 'web') {
+    const assets = Array.from(webTables.local_assets.values()) as LocalAsset[];
+    return inventoryId ? assets.filter((a) => a.inventory_id === inventoryId) : assets;
+  }
+
+  const database = getDb();
+  if (inventoryId) {
+    return database.getAllSync<LocalAsset>(
+      `SELECT * FROM local_assets WHERE inventory_id = ? ORDER BY asset_id`,
+      inventoryId
+    );
+  }
+  return database.getAllSync<LocalAsset>(`SELECT * FROM local_assets ORDER BY asset_id`);
+}
+
+// Conteo de activos locales, opcionalmente por inventario
+export function getAssetsCount(inventoryId?: string): number {
+  if (Platform.OS === 'web') {
+    const assets = Array.from(webTables.local_assets.values()) as LocalAsset[];
+    return inventoryId ? assets.filter((a) => a.inventory_id === inventoryId).length : assets.length;
+  }
+
+  const database = getDb();
+  if (inventoryId) {
+    const row = database.getFirstSync<{ c: number }>(
+      `SELECT COUNT(*) as c FROM local_assets WHERE inventory_id = ?`,
+      inventoryId
+    );
+    return row?.c ?? 0;
+  }
+  const row = database.getFirstSync<{ c: number }>(`SELECT COUNT(*) as c FROM local_assets`);
+  return row?.c ?? 0;
+}
+
+// Busca un activo por código (asset_id), sin filtrar por inventario
 export function findLocalAssetByCode(assetId: string): { asset_id: string; name: string | null } | null {
   if (Platform.OS === 'web') {
     for (const asset of webTables.local_assets.values()) {
@@ -103,7 +167,7 @@ export function addPendingScan(inventoryId: string, assetId: string) {
     webTables.pending_scans.set(id, {
       inventory_id: inventoryId,
       asset_id: assetId,
-      scanned_at: scannedAt
+      scanned_at: scannedAt,
     });
     return;
   }

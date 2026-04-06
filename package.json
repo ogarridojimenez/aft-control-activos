@@ -18,5 +18,18 @@
   "devDependencies": {
     "turbo": "^1.10.0",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "dependencies": {
+    "@react-navigation/core": "^7.17.2",
+    "@react-navigation/elements": "^2.9.14",
+    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native-stack": "^7.14.10",
+    "@react-navigation/routers": "^7.5.3",
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-screens": "^4.24.0"
   }
 }

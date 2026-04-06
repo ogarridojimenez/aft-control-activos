@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   StyleSheet,
   ScrollView,
@@ -20,9 +19,7 @@ import {
 } from '../services/sqliteService';
 import {
   fetchAssetsForArea,
-  fetchInventoryArea,
-  signInWithPassword,
-  signOut,
+  fetchInventories,
   supabase,
 } from '../services/supabaseService';
 import { syncInventoryToAdmin } from '../services/syncService';
@@ -33,59 +30,52 @@ export type RootStackParamList = {
   QrScanner: { inventoryId: string; onScanSuccess: (code: string) => void };
 };
 
+type InventoryItem = {
+  id: string;
+  area_id: string;
+  inventory_date: string;
+  status: string;
+  notes: string | null;
+  areas: { name: string; code: string } | null;
+};
+
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
 export function HomeScreen({ navigation }: Props) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [inventoryId, setInventoryId] = useState(() => getMeta('last_inventory_id') ?? '');
+  const [inventories, setInventories] = useState<InventoryItem[]>([]);
+  const [selectedId, setSelectedId] = useState(() => getMeta('last_inventory_id') ?? '');
   const [busy, setBusy] = useState(false);
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-
-  async function refreshSession() {
-    const { data } = await supabase.auth.getSession();
-    setSessionEmail(data.session?.user.email ?? null);
-  }
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void refreshSession();
+    loadInventories();
   }, []);
 
-  async function onLogin() {
-    setBusy(true);
+  async function loadInventories() {
+    setLoading(true);
     try {
-      await signInWithPassword(email.trim(), password);
-      setPassword('');
-      await refreshSession();
-      Alert.alert('Listo', 'Sesión iniciada');
+      const list = await fetchInventories();
+      setInventories(list as InventoryItem[]);
+      if (list.length > 0 && !selectedId) {
+        setSelectedId(list[0].id);
+      }
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo iniciar sesión');
+      Alert.alert('Error', 'No se pudieron cargar los inventarios. Verifica la conexión a Supabase.');
     }
-    setBusy(false);
-  }
-
-  async function onLogout() {
-    setBusy(true);
-    try {
-      await signOut();
-      await refreshSession();
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Error');
-    }
-    setBusy(false);
+    setLoading(false);
   }
 
   async function onDownload() {
-    const id = inventoryId.trim();
+    const id = selectedId.trim();
     if (!id) {
-      Alert.alert('Falta ID', 'Pega el UUID del inventario creado en el portal.');
+      Alert.alert('Sin selección', 'Selecciona un inventario de la lista.');
       return;
     }
     setBusy(true);
     try {
-      const inv = await fetchInventoryArea(id);
+      const inv = inventories.find((i) => i.id === id);
       if (!inv) {
-        Alert.alert('No encontrado', 'No existe ese inventario o no tienes permiso (RLS).');
+        Alert.alert('Error', 'Inventario no encontrado en la lista.');
         setBusy(false);
         return;
       }
@@ -100,15 +90,15 @@ export function HomeScreen({ navigation }: Props) {
         }))
       );
       setMeta('last_inventory_id', id);
-      Alert.alert('Descarga', `${assets.length} activos guardados en SQLite`);
+      Alert.alert('Descarga completada', `${assets.length} activos guardados en SQLite`);
     } catch (e) {
-      Alert.alert('Error', 'No se pudo descargar. Verifica que el inventario exista y tengas permisos.');
+      Alert.alert('Error', 'No se pudo descargar. Verifica que el inventario exista.');
     }
     setBusy(false);
   }
 
   async function onSync() {
-    const id = inventoryId.trim();
+    const id = selectedId.trim();
     if (!id) return;
     const pending = getPendingScansForInventory(id);
     if (pending.length === 0) {
@@ -120,12 +110,8 @@ export function HomeScreen({ navigation }: Props) {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        Alert.alert('Sesión', 'Inicia sesión primero en la app.');
-        setBusy(false);
-        return;
-      }
-      const result = await syncInventoryToAdmin(id, pending, session.access_token);
+      const token = session?.access_token ?? '';
+      const result = await syncInventoryToAdmin(id, pending, token);
       clearPendingScansForInventory(id);
       Alert.alert(
         'Sincronizado',
@@ -137,42 +123,70 @@ export function HomeScreen({ navigation }: Props) {
     setBusy(false);
   }
 
-  const pendingCount =
-    inventoryId.trim() ? getPendingScansForInventory(inventoryId.trim()).length : 0;
+  const pendingCount = selectedId.trim() ? getPendingScansForInventory(selectedId.trim()).length : 0;
+  const selectedInv = inventories.find((i) => i.id === selectedId);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>AFT — Campo</Text>
       <Text style={styles.sub}>
-        Inicia sesión (Supabase), descarga activos del inventario, escanea en la siguiente pantalla y sincroniza con el
-        portal.
+        Selecciona un inventario, descarga los activos, escanea y sincroniza.
       </Text>
 
+      {/* Inventory selector */}
       <View style={styles.card}>
-        <Text style={styles.label}>Conexión Supabase</Text>
-        <Text style={styles.sub}>
-          Conectado automáticamente usando autenticación anónima
-        </Text>
+        <Text style={styles.label}>Inventario</Text>
+        {loading ? (
+          <ActivityIndicator size="small" color="#2563eb" style={{ marginVertical: 12 }} />
+        ) : inventories.length === 0 ? (
+          <Text style={styles.hint}>No hay inventarios disponibles</Text>
+        ) : (
+          inventories.map((inv) => {
+            const area = inv.areas;
+            const isSelected = inv.id === selectedId;
+            return (
+              <Pressable
+                key={inv.id}
+                style={[
+                  styles.invItem,
+                  isSelected && styles.invItemSelected,
+                ]}
+                onPress={() => setSelectedId(inv.id)}
+              >
+                <View style={styles.invRow}>
+                  <Text style={[styles.invArea, isSelected && styles.invTextSelected]}>
+                    {area?.name ?? 'Sin área'} ({area?.code ?? '?'})
+                  </Text>
+                  <Text style={[styles.invStatus, isSelected && styles.invTextSelected]}>
+                    {inv.status}
+                  </Text>
+                </View>
+                <Text style={[styles.invDate, isSelected && styles.invTextSelected]}>
+                  {inv.inventory_date}
+                </Text>
+              </Pressable>
+            );
+          })
+        )}
       </View>
 
+      {/* Actions */}
       <View style={styles.card}>
-        <Text style={styles.label}>Inventario (UUID)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="00000000-0000-0000-0000-000000000000"
-          autoCapitalize="none"
-          value={inventoryId}
-          onChangeText={setInventoryId}
-        />
-        <Pressable style={styles.btn} onPress={onDownload} disabled={busy}>
-          <Text style={styles.btnText}>Descargar activos del área</Text>
+        <Text style={styles.label}>Acciones</Text>
+        {selectedInv && (
+          <Text style={styles.hint}>
+            Área: {selectedInv.areas?.name ?? '—'} · {selectedInv.inventory_date}
+          </Text>
+        )}
+        <Pressable style={styles.btn} onPress={onDownload} disabled={busy || inventories.length === 0}>
+          <Text style={styles.btnText}>Descargar activos</Text>
         </Pressable>
         <Pressable
           style={[styles.btn, styles.btnOutline]}
-          onPress={() => navigation.navigate('Scan', { inventoryId: inventoryId.trim() })}
-          disabled={busy || !inventoryId.trim()}
+          onPress={() => navigation.navigate('Scan', { inventoryId: selectedId.trim() })}
+          disabled={busy || !selectedId.trim()}
         >
-          <Text style={styles.btnOutlineText}>Ir a escanear / registrar</Text>
+          <Text style={styles.btnOutlineText}>Ir a escanear</Text>
         </Pressable>
         <Text style={styles.hint}>Pendientes de envío: {pendingCount}</Text>
         <Pressable style={styles.btn} onPress={onSync} disabled={busy || pendingCount === 0}>
@@ -198,15 +212,30 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 8 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
+  invItem: {
+    padding: 12,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 6,
   },
+  invItemSelected: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  invRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  invArea: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
+  invStatus: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  invDate: { fontSize: 12, color: '#64748b', marginTop: 4 },
+  invTextSelected: { color: '#fff' },
   btn: {
     backgroundColor: '#2563eb',
     paddingVertical: 12,
@@ -222,14 +251,5 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   btnOutlineText: { color: '#2563eb', fontWeight: '600', fontSize: 15 },
-  btnSecondary: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
-  },
-  btnSecondaryText: { color: '#0f172a', fontWeight: '600' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  session: { flex: 1, color: '#0f172a', fontWeight: '500' },
   hint: { marginTop: 10, color: '#64748b', fontSize: 13 },
 });

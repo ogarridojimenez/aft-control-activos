@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Alert, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './HomeScreen';
-import { sanitizeAssetId, validateAssetId } from '@aft/shared';
+import { sanitizeAssetId, validateAssetId } from '../utils/assetValidation';
 import { findLocalAssetByCode, addPendingScan } from '../services/sqliteService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { sanitizeAssetId, validateAssetId, ASSET_ID_REGEX } from '@aft/shared';
+import { sanitizeAssetId, validateAssetId, ASSET_ID_REGEX } from '../utils/assetValidation';
 import { addPendingScan, findLocalAssetByCode } from '../services/sqliteService';
 
 interface QrScannerScreenProps {

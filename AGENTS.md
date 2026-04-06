@@ -35,7 +35,7 @@ Mobile `EXPO_PUBLIC_ADMIN_API_URL` = `http://10.0.2.2:3000` for Android emulator
 ## Auth Flow
 
 - **Admin**: Supabase Auth via `@supabase/ssr` cookies. `middleware.ts` redirects unauthenticated → `/login`. API routes use `requireAuth()` / `requireAdmin()` from `lib/auth/guard.ts`.
-- **Mobile**: `supabase.auth.signInWithPassword()` stores session in client. Sync sends `Authorization: Bearer <token>` to admin API.
+- **Mobile**: Uses anon key for reading inventories/assets (RLS allows anon SELECT). Sync to admin API sends optional Bearer token. No login required for mobile scan flow.
 - Test credentials: `admin@ejemplo.com` / `Admin123!`
 
 ## Database
@@ -58,11 +58,19 @@ Key tables: `areas`, `assets` (asset_id format `MB` + 5+ digits), `user_profiles
 
 ## Mobile: Offline-First Flow
 
-1. **Download**: fetches inventory area from Supabase, stores assets in SQLite `local_assets`.
-2. **Scan**: camera (`expo-camera`) or manual entry → validates with `@aft/shared` → stores in SQLite `pending_scans`.
-3. **Sync**: POSTs pending scans to `/api/sync/inventory` with Bearer token → clears `pending_scans` on success.
+1. **Download**: fetches inventories list from Supabase via `fetchInventories()`, user selects one → fetches assets for that inventory's area → stores in SQLite `local_assets`.
+2. **Scan**: camera (`expo-camera`) or manual entry → validates with `src/utils/assetValidation.ts` (local copy of @aft/shared regex) → stores in SQLite `pending_scans`.
+3. **Sync**: POSTs pending scans to `/api/sync/inventory` with optional Bearer token → clears `pending_scans` on success.
 
 SQLite tables: `local_assets`, `pending_scans`, `app_meta`. On web platform, falls back to in-memory `Map`.
+
+Key mobile files:
+- `src/screens/HomeScreen.tsx` — inventory selector (dropdown from Supabase), download/sync actions
+- `src/screens/ScanScreen.tsx` — manual entry + button to open QR camera
+- `src/screens/QrScannerScreen.tsx` — full-screen camera with `CameraView`, cooldown, haptics
+- `src/services/supabaseService.ts` — `fetchInventories()`, `fetchInventoryArea()`, `fetchAssetsForArea()`
+- `src/services/sqliteService.ts` — local SQLite CRUD with web fallback
+- `src/utils/assetValidation.ts` — local copy of ASSET_ID_REGEX, sanitizeAssetId, validateAssetId
 
 ## Conventions
 

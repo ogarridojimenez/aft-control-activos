@@ -34,11 +34,11 @@ Monorepo para la gestión de inventario de activos fijos tangibles. Portal web a
 - **Reportes** — Descarga PDF o Excel de conciliación (resumen + detalle + sobrantes)
 
 ### App Móvil (`apps/mobile`)
-- **Login** — Supabase Auth (email/password)
+- **Selector de inventarios** — Lista de inventarios desde Supabase (sin login requerido)
 - **Descarga offline** — Descarga activos del inventario a SQLite local
 - **Escaneo QR** — Cámara en tiempo real con `expo-camera`
 - **Entrada manual** — Ingreso de código como alternativa
-- **Validación local** — Verifica si el activo está en la descarga
+- **Validación local** — Verifica si el activo está en la descarga (`src/utils/assetValidation.ts`)
 - **Sincronización** — Envía escaneos al portal admin para conciliación
 
 ## Stack Tecnológico

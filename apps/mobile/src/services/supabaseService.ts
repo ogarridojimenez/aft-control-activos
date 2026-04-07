@@ -1,10 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
 import { cacheInventories, getCachedInventories, isInventoriesCacheValid, setInventoriesCacheTimestamp, clearInventoriesCache, type CachedInventory } from './sqliteService';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const ExpoSecureStoreAdapter = {
+  getItem: (key: string) => SecureStore.getItemAsync(key),
+  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
+  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: ExpoSecureStoreAdapter,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
 
 export async function signInWithPassword(email: string, password: string) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -35,6 +49,7 @@ export async function fetchInventories(forceRefresh = false): Promise<any[]> {
     .from('inventories')
     .select('id, area_id, inventory_date, status, notes, areas(name, code)')
     .order('inventory_date', { ascending: false });
+
   if (error) {
     if (isInventoriesCacheValid()) {
       const cached = getCachedInventories();
@@ -63,7 +78,7 @@ export async function fetchInventories(forceRefresh = false): Promise<any[]> {
   }));
   cacheInventories(cached);
   setInventoriesCacheTimestamp();
-  
+
   return inventories;
 }
 

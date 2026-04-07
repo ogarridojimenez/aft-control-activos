@@ -7,23 +7,16 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [workspaceRoot];
+
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-config.resolver = {
-  ...config.resolver,
-  sourceExts: [...config.resolver.sourceExts, 'cjs', 'json'],
-  resolveRequest: (context, moduleName, platform) => {
-    if (platform === 'ios' || platform === 'android') {
-      return {
-        filePath: moduleName,
-        type: 'sourceFile',
-      };
-    }
-    return context.resolveRequest(context, moduleName, platform);
-  },
-};
+config.resolver.sourceExts = [
+  ...config.resolver.sourceExts,
+  'cjs',
+  'json',
+];
 
 module.exports = config;

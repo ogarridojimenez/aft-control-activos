@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Modal,
-  FlatList,
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -58,7 +57,6 @@ export function HomeScreen({ navigation }: Props) {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [syncProgress, setSyncProgress] = useState<{ current: number; total: number } | null>(null);
 
-  // Load inventories once on mount
   useEffect(() => {
     (async () => {
       try {
@@ -77,7 +75,6 @@ export function HomeScreen({ navigation }: Props) {
     })();
   }, []);
 
-  // Update assets count when selection changes
   useEffect(() => {
     if (selectedId) {
       setAssetsCount(getAssetsCount(selectedId));
@@ -208,18 +205,14 @@ export function HomeScreen({ navigation }: Props) {
         ) : inventories.length === 0 ? (
           <Text style={styles.hint}>No hay inventarios disponibles</Text>
         ) : (
-          <FlatList
-            data={inventories}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item: inv }) => {
+          <View style={styles.invList}>
+            {inventories.map((inv) => {
               const area = inv.areas;
               const isSelected = inv.id === selectedId;
               return (
                 <Pressable
-                  style={[
-                    styles.invItem,
-                    isSelected && styles.invItemSelected,
-                  ]}
+                  key={inv.id}
+                  style={[styles.invItem, isSelected && styles.invItemSelected]}
                   onPress={() => setSelectedId(inv.id)}
                 >
                   <View style={styles.invRow}>
@@ -235,12 +228,8 @@ export function HomeScreen({ navigation }: Props) {
                   </Text>
                 </Pressable>
               );
-            }}
-            initialNumToRender={10}
-            maxToRenderPerBatch={5}
-            windowSize={5}
-            style={styles.invList}
-          />
+            })}
+          </View>
         )}
       </View>
 
@@ -291,11 +280,11 @@ export function HomeScreen({ navigation }: Props) {
               </Text>
             )}
             <View style={styles.progressBar}>
-              <View 
+              <View
                 style={[
-                  styles.progressFill, 
+                  styles.progressFill,
                   { width: syncProgress ? `${(syncProgress.current / syncProgress.total) * 100}%` : '0%' }
-                ]} 
+                ]}
               />
             </View>
           </View>

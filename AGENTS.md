@@ -20,7 +20,8 @@ npm run dev              # starts admin + mobile in parallel (turbo)
 cd apps/admin && npm run dev    # admin only (http://localhost:3000)
 cd apps/mobile && npx expo start  # mobile only
 
-node scripts/test-all.js  # 39-test suite (DB + API + pages + config)
+node scripts/test-all.js  # Configuration tests
+node scripts/test-e2e.js   # E2E tests (23 tests)
 ```
 
 ## Environment Files (never commit)
@@ -35,7 +36,7 @@ Mobile `EXPO_PUBLIC_ADMIN_API_URL` = `http://10.0.2.2:3000` for Android emulator
 ## Auth Flow
 
 - **Admin**: Supabase Auth via `@supabase/ssr` cookies. `middleware.ts` redirects unauthenticated → `/login`. API routes use `requireAuth()` / `requireAdmin()` from `lib/auth/guard.ts`.
-- **Mobile**: Uses anon key for reading inventories/assets (RLS allows anon SELECT). Sync to admin API sends optional Bearer token. No login required for mobile scan flow.
+- **Mobile**: Uses anon key for reading inventories/assets (RLS allows anon SELECT). Sync to admin API sends optional Bearer token. Session persisted with expo-secure-store. No login required for mobile scan flow.
 - Test credentials: `admin@ejemplo.com` / `Admin123!`
 
 ## Database
@@ -60,17 +61,37 @@ Key tables: `areas`, `assets` (asset_id format `MB` + 5+ digits), `user_profiles
 
 1. **Download**: fetches inventories list from Supabase via `fetchInventories()`, user selects one → fetches assets for that inventory's area → stores in SQLite `local_assets`.
 2. **Scan**: camera (`expo-camera`) or manual entry → validates with `src/utils/assetValidation.ts` (local copy of @aft/shared regex) → stores in SQLite `pending_scans`.
-3. **Sync**: POSTs pending scans to `/api/sync/inventory` with optional Bearer token → clears `pending_scans` on success.
+3. **Sync**: POSTs pending scans to `/api/sync/inventory` with optional Bearer token → clears `pending_scans` on success. Supports incremental sync with 50-item batches and exponential backoff retry.
 
-SQLite tables: `local_assets`, `pending_scans`, `app_meta`. On web platform, falls back to in-memory `Map`.
+SQLite tables: `local_assets`, `pending_scans`, `app_meta`, `cached_inventories`. On web platform, falls back to in-memory `Map`.
 
 Key mobile files:
-- `src/screens/HomeScreen.tsx` — inventory selector (dropdown from Supabase), download/sync actions
+- `src/screens/HomeScreen.tsx` — inventory selector, download/sync actions, progress modal
 - `src/screens/ScanScreen.tsx` — manual entry + button to open QR camera
 - `src/screens/QrScannerScreen.tsx` — full-screen camera with `CameraView`, cooldown, haptics
-- `src/services/supabaseService.ts` — `fetchInventories()`, `fetchInventoryArea()`, `fetchAssetsForArea()`
-- `src/services/sqliteService.ts` — local SQLite CRUD with web fallback
-- `src/utils/assetValidation.ts` — local copy of ASSET_ID_REGEX, sanitizeAssetId, validateAssetId
+- `src/screens/LocalAssetsScreen.tsx` — view downloaded assets with search
+- `src/services/supabaseService.ts` — `fetchInventories()` with SQLite cache fallback
+- `src/services/sqliteService.ts` — local SQLite CRUD with web fallback, batch inserts
+- `src/services/syncService.ts` — incremental sync with retry and checkpoint
+- `src/utils/assetValidation.ts` — ASSET_ID_REGEX, sanitizeAssetId, validateAssetId
+- `src/utils/retry.ts` — retryWithBackoff utility
+- `src/hooks/useNetworkStatus.ts` — online/offline detection
+- `src/components/ErrorBoundary.tsx` — error boundary wrapper
+
+## Key Features Implemented
+
+| Feature | Status |
+|---------|--------|
+| Offline-first with SQLite | ✅ |
+| QR scanning with expo-camera | ✅ |
+| Incremental sync with retry | ✅ |
+| Inventory caching | ✅ |
+| Session persistence (SecureStore) | ✅ |
+| Error boundaries | ✅ |
+| Lazy loading | ✅ |
+| Network status indicator | ✅ |
+| PDF/Excel reports | ✅ |
+| Batch inserts | ✅ |
 
 ## Conventions
 
@@ -87,3 +108,4 @@ Key mobile files:
 - Mobile React versions are pinned to 18.2.0 (not 18.3) for Expo SDK 51 compatibility.
 - `requireAdmin` checks `user_profiles.role === 'admin'` via Supabase admin client.
 - Excel processing is synchronous — large files may timeout on serverless.
+- Use environment variables for Supabase URLs — never hardcode.
